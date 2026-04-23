@@ -1,0 +1,327 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Social Platform API",
+    "description": "Backend Engineering Assignment — Core API & Guardrails\n\nPhase 1: Standard REST endpoints\nPhase 2: Redis Virality Engine & Atomic Locks\nPhase 3: Notification Engine\n\nBase URL: http://localhost:8080",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Setup — Seed Data",
+      "item": [
+        {
+          "name": "Create User (Alice — Premium)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/users?username=alice&isPremium=true",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "users"],
+              "query": [
+                { "key": "username", "value": "alice" },
+                { "key": "isPremium", "value": "true" }
+              ]
+            },
+            "description": "Creates a premium human user named Alice. Returns user id (use in subsequent requests)."
+          }
+        },
+        {
+          "name": "Create User (Bob — Free)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/users?username=bob&isPremium=false",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "users"],
+              "query": [
+                { "key": "username", "value": "bob" },
+                { "key": "isPremium", "value": "false" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Bot (NovaSpark)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/bots?name=NovaSpark&personaDescription=An enthusiastic AI that loves technology discussions.",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "bots"],
+              "query": [
+                { "key": "name", "value": "NovaSpark" },
+                { "key": "personaDescription", "value": "An enthusiastic AI that loves technology discussions." }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Bot (EchoMind)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/bots?name=EchoMind&personaDescription=A thoughtful AI providing insightful replies.",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "bots"],
+              "query": [
+                { "key": "name", "value": "EchoMind" },
+                { "key": "personaDescription", "value": "A thoughtful AI providing insightful replies." }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Phase 1 — Standard REST",
+      "item": [
+        {
+          "name": "Create Post (by Human User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"USER\",\n  \"content\": \"Just launched my new AI startup! Excited to share the journey. #AI #Startup\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/posts",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts"]
+            },
+            "description": "Creates a post authored by User id=1 (Alice). Expected: 201 Created."
+          }
+        },
+        {
+          "name": "Create Post (by Bot)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"BOT\",\n  \"content\": \"Exciting developments in the AI space today! Let's discuss.\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/posts",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts"]
+            }
+          }
+        },
+        {
+          "name": "Add Human Comment (depth 1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 2,\n  \"authorType\": \"USER\",\n  \"content\": \"Congrats Alice! This is amazing news.\",\n  \"depthLevel\": 1\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/posts/1/comments",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts", "1", "comments"]
+            },
+            "description": "Human comment on post 1. Adds +50 virality. No guardrails apply."
+          }
+        },
+        {
+          "name": "Add Bot Comment (depth 1) — TRIGGERS GUARDRAILS",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"BOT\",\n  \"content\": \"Great post! The AI revolution is truly underway. NovaSpark approves!\",\n  \"depthLevel\": 1\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/posts/1/comments",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts", "1", "comments"]
+            },
+            "description": "Bot comment. Triggers all 3 guardrails:\n1. Horizontal cap check (bot_count++)\n2. Cooldown check (bot 1 → user 1)\n3. Depth check (depth 1 is fine)\nAdds +1 virality. Logs push notification."
+          }
+        },
+        {
+          "name": "Like a Post (Human)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 2\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/posts/1/like",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts", "1", "like"]
+            },
+            "description": "Likes post 1 as User id=2 (Bob). Adds +20 virality. Expected: 200 OK."
+          }
+        },
+        {
+          "name": "Get Virality Score",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/posts/1/virality",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts", "1", "virality"]
+            },
+            "description": "Returns real-time virality score from Redis for post 1.\nExpected after bot comment + like: 1 (bot) + 20 (like) = 21"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Phase 2 — Guardrail Tests",
+      "item": [
+        {
+          "name": "TEST: Vertical Cap — Depth > 20 (expect 429)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"BOT\",\n  \"content\": \"This reply is too deep!\",\n  \"depthLevel\": 21\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/posts/1/comments",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts", "1", "comments"]
+            },
+            "description": "Expected: 429 Too Many Requests — Vertical cap exceeded (depthLevel=21 > 20)"
+          }
+        },
+        {
+          "name": "TEST: Cooldown Cap — Same Bot Second Time (expect 429)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"BOT\",\n  \"content\": \"Trying to interact again within 10 minutes!\",\n  \"depthLevel\": 1\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/posts/1/comments",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts", "1", "comments"]
+            },
+            "description": "Send this immediately after the bot comment above.\nExpected: 429 Too Many Requests — Cooldown active for bot 1 → user 1"
+          }
+        },
+        {
+          "name": "TEST: Horizontal Cap — 101st Bot Comment (expect 429)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 2,\n  \"authorType\": \"BOT\",\n  \"content\": \"This is the 101st bot reply, should be rejected!\",\n  \"depthLevel\": 1\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/posts/1/comments",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts", "1", "comments"]
+            },
+            "description": "Use a separate post where you've already pushed 100 bot comments.\nExpected: 429 Too Many Requests — Horizontal cap reached"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Phase 3 — Notification Tests",
+      "item": [
+        {
+          "name": "Trigger First Bot Interaction (should get PUSH SENT in logs)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 2,\n  \"authorType\": \"BOT\",\n  \"content\": \"EchoMind says: Fascinating perspective on AI startups!\",\n  \"depthLevel\": 1\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/posts/1/comments",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts", "1", "comments"]
+            },
+            "description": "First interaction by bot 2 → user 1.\nCheck console: should see '[PUSH NOTIFICATION SENT] to User 1'"
+          }
+        },
+        {
+          "name": "Trigger Second Bot Interaction (should be QUEUED in logs)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 2,\n  \"authorType\": \"BOT\",\n  \"content\": \"EchoMind follows up: Have you considered the regulatory implications?\",\n  \"depthLevel\": 2\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/posts/1/comments",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "posts", "1", "comments"]
+            },
+            "description": "Use a DIFFERENT post where cooldown hasn't been set yet for this bot.\nOr wait 10 min for cooldown to expire.\nCheck console: should see '[NOTIF QUEUED] User 1 → pending queue'"
+          }
+        }
+      ]
+    }
+  ]
+}
